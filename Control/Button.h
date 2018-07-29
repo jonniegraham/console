@@ -32,7 +32,7 @@ private:
 
     typedef struct {
         SDL_Rect rectangle;
-        string text;
+        string text = "";
         int fontSize = 12;
         string fontPath = "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf";
         struct {
@@ -41,28 +41,27 @@ private:
 
     } TextAttributes;
 
-    ButtonAttributes button_attr;
-    TextAttributes text_attr;
+    ButtonAttributes buttonAttributes;
+    TextAttributes textAttributes;
 
     mutex buttonDown_mutex;
     mutex buttonUp_mutex;
     mutex mouseOver_mutex;
     mutex mouseOut_mutex;
-
     mutex attr_mutex;
 
     SDL_Texture* textTexture = nullptr;
     SDL_Surface* surface = nullptr;
     TTF_Font* font = nullptr;
 
-    vector<MouseLeftButtonDownHandler<Button>*> buttonDown_Handlers;
-    vector<MouseLeftButtonUpHandler<Button>*> buttonUp_Handlers;
-    vector<MouseOverHandler<Button>*> mouseOver_Handlers;
-    vector<MouseOutHandler<Button>*> mouseOut_Handlers;
+    vector<MouseLeftButtonDownHandler<Button>*> buttonDown_handlers;
+    vector<MouseLeftButtonUpHandler<Button>*> buttonUp_handlers;
+    vector<MouseOverHandler<Button>*> mouseOver_handlers;
+    vector<MouseOutHandler<Button>*> mouseOut_handlers;
 
     inline void initializeFont() {
         if (font == nullptr) {
-            font = TTF_OpenFont(text_attr.fontPath.c_str(), text_attr.fontSize);
+            font = TTF_OpenFont(textAttributes.fontPath.c_str(), textAttributes.fontSize);
             TTF_SetFontStyle(font, TTF_STYLE_BOLD);
         }
     }
@@ -80,7 +79,7 @@ private:
         SDL_FreeSurface(surface);
     }
 
-    void setText(SDL_Renderer* const renderer) {
+    void RenderText(SDL_Renderer* const renderer) {
 
         freeTextResources();
         initializeTTF();
@@ -88,33 +87,38 @@ private:
 
         {   // lock scope
             lock_guard<mutex> lockGuard(attr_mutex);
-            text_attr.rectangle.x = static_cast<int>(button_attr.rectangle.x + (button_attr.rectangle.w / 2) -
-                                                     ((text_attr.text.length() / 2) *
-                                                      (text_attr.fontSize - (0.35 * text_attr.fontSize))));
-            text_attr.rectangle.y = static_cast<int>(button_attr.rectangle.y + (button_attr.rectangle.h / 2) -
-                                                     ((text_attr.fontSize - (0.1 * text_attr.fontSize)) / 2));
+            textAttributes.rectangle.x = static_cast<int>(buttonAttributes.rectangle.x +
+                                                          (buttonAttributes.rectangle.w / 2) -
+                                                          ((textAttributes.text.length() / 2) *
+                                                           (textAttributes.fontSize -
+                                                            (0.35 * textAttributes.fontSize))));
+            textAttributes.rectangle.y = static_cast<int>(buttonAttributes.rectangle.y +
+                                                          (buttonAttributes.rectangle.h / 2) -
+                                                          ((textAttributes.fontSize - (0.1 * textAttributes.fontSize)) /
+                                                           2));
         }
 
-        surface = TTF_RenderText_Solid(font, text_attr.text.c_str(),
-                                       {text_attr.Color.r, text_attr.Color.g, text_attr.Color.b, text_attr.Color.a});
+        surface = TTF_RenderText_Solid(font, textAttributes.text.c_str(),
+                                       {textAttributes.Color.r, textAttributes.Color.g, textAttributes.Color.b,
+                                        textAttributes.Color.a});
 
-        text_attr.rectangle.w = surface->w;
-        text_attr.rectangle.h = surface->h;
+        textAttributes.rectangle.w = surface->w;
+        textAttributes.rectangle.h = surface->h;
 
         textTexture = SDL_CreateTextureFromSurface(renderer, surface);
-        SDL_RenderCopy(renderer, textTexture, NULL, &text_attr.rectangle);
+        SDL_RenderCopy(renderer, textTexture, NULL, &textAttributes.rectangle);
     }
 
-    inline void handleError(const char* const c_str) const {
-        cerr << c_str;
+    inline void handleError(const char* const errorMessage) const {
+        cerr << errorMessage;
         exit(EXIT_FAILURE);
     }
 
     void resetButtonDownHandlers() {
         lock_guard<mutex> lockGuard(buttonDown_mutex);
 
-        auto i = buttonDown_Handlers.begin();
-        auto end = buttonDown_Handlers.end();
+        auto i = buttonDown_handlers.begin();
+        auto end = buttonDown_handlers.end();
 
         for (; i != end; i++) {
             (*i)->SetEnabled();
@@ -124,8 +128,8 @@ private:
     void resetButtonUpHandlers() {
         lock_guard<mutex> lockGuard(buttonUp_mutex);
 
-        auto i = buttonUp_Handlers.begin();
-        auto end = buttonUp_Handlers.end();
+        auto i = buttonUp_handlers.begin();
+        auto end = buttonUp_handlers.end();
 
         for (; i != end; i++) {
             (*i)->SetEnabled();
@@ -135,8 +139,8 @@ private:
     void resetMouseOverHandlers() {
         lock_guard<mutex> lockGuard(mouseOver_mutex);
 
-        auto i = mouseOver_Handlers.begin();
-        auto end = mouseOver_Handlers.end();
+        auto i = mouseOver_handlers.begin();
+        auto end = mouseOver_handlers.end();
 
         for (; i != end; i++) {
             (*i)->SetEnabled();
@@ -146,8 +150,8 @@ private:
     void resetMouseOutHandlers() {
         lock_guard<mutex> lockGuard(mouseOut_mutex);
 
-        auto i = mouseOut_Handlers.begin();
-        auto end = mouseOut_Handlers.end();
+        auto i = mouseOut_handlers.begin();
+        auto end = mouseOut_handlers.end();
 
         for (; i != end; i++) {
             (*i)->SetEnabled();
@@ -163,10 +167,10 @@ private:
 
     void onButtonDown() {
         resetButtonUpHandlers();
-        lock_guard<mutex> lockGuard(this->buttonDown_mutex);
+        lock_guard<mutex> lockGuard(buttonDown_mutex);
 
-        auto currHandler = this->buttonDown_Handlers.begin();
-        auto end = this->buttonDown_Handlers.end();
+        auto currHandler = buttonDown_handlers.begin();
+        auto end = buttonDown_handlers.end();
 
         for (; currHandler != end; currHandler++) {
             invokeHandler(*currHandler);
@@ -175,10 +179,10 @@ private:
 
     void onButtonUp() {
         resetButtonDownHandlers();
-        lock_guard<mutex> lockGuard(this->buttonUp_mutex);
+        lock_guard<mutex> lockGuard(buttonUp_mutex);
 
-        auto currHandler = this->buttonUp_Handlers.begin();
-        auto end = this->buttonUp_Handlers.end();
+        auto currHandler = this->buttonUp_handlers.begin();
+        auto end = this->buttonUp_handlers.end();
 
         for (; currHandler != end; currHandler++) {
             invokeHandler(*currHandler);
@@ -187,10 +191,10 @@ private:
 
     void onMouseOver() {
         resetMouseOutHandlers();
-        lock_guard<mutex> lockGuard(this->mouseOver_mutex);
+        lock_guard<mutex> lockGuard(mouseOver_mutex);
 
-        auto currHandler = this->mouseOver_Handlers.begin();
-        auto end = this->mouseOver_Handlers.end();
+        auto currHandler = mouseOver_handlers.begin();
+        auto end = mouseOver_handlers.end();
 
         for (; currHandler != end; currHandler++) {
             invokeHandler(*currHandler);
@@ -199,10 +203,10 @@ private:
 
     void onMouseOut() {
         resetMouseOverHandlers();
-        lock_guard<mutex> lockGuard(this->mouseOut_mutex);
+        lock_guard<mutex> lockGuard(mouseOut_mutex);
 
-        auto currHandler = this->mouseOut_Handlers.begin();
-        auto end = this->mouseOut_Handlers.end();
+        auto currHandler = mouseOut_handlers.begin();
+        auto end = mouseOut_handlers.end();
 
         for (; currHandler != end; currHandler++) {
             invokeHandler(*currHandler);
@@ -211,60 +215,65 @@ private:
 
 public:
     Button() {
-        text_attr.text = "Hell\0";
+        textAttributes.text = "Hell\0";
     }
 
     ~Button() {
         freeTextResources();
         TTF_Quit();
-        Utilities::DeleteVector<MouseLeftButtonDownHandler<Button>*>(buttonDown_Handlers);
-        Utilities::DeleteVector<MouseLeftButtonUpHandler<Button>*>(buttonUp_Handlers);
-        Utilities::DeleteVector<MouseOverHandler<Button>*>(mouseOver_Handlers);
-        Utilities::DeleteVector<MouseOutHandler<Button>*>(mouseOut_Handlers);
+        Utilities::DeleteVector<MouseLeftButtonDownHandler<Button>*>(buttonDown_handlers);
+        Utilities::DeleteVector<MouseLeftButtonUpHandler<Button>*>(buttonUp_handlers);
+        Utilities::DeleteVector<MouseOverHandler<Button>*>(mouseOver_handlers);
+        Utilities::DeleteVector<MouseOutHandler<Button>*>(mouseOut_handlers);
     }
 
 
     inline void
     SetRectangle(const unsigned int x, const unsigned int y, const unsigned int height, const unsigned int width) {
         lock_guard<mutex> lockGuard(attr_mutex);
-        button_attr.rectangle.x = x;
-        button_attr.rectangle.y = y;
-        button_attr.rectangle.w = width;
-        button_attr.rectangle.h = height;
+        buttonAttributes.rectangle.x = x;
+        buttonAttributes.rectangle.y = y;
+        buttonAttributes.rectangle.w = width;
+        buttonAttributes.rectangle.h = height;
     }
 
     inline void SetBackgroundColor(const Uint8 r, const Uint8 g, const Uint8 b, const Uint8 a) {
         lock_guard<mutex> lockGuard(attr_mutex);
-        button_attr.Color.r = r;
-        button_attr.Color.g = g;
-        button_attr.Color.b = b;
-        button_attr.Color.a = a;
+        buttonAttributes.Color.r = r;
+        buttonAttributes.Color.g = g;
+        buttonAttributes.Color.b = b;
+        buttonAttributes.Color.a = a;
     }
 
     inline void SetFontSize(const unsigned int fontSize) {
-        this->text_attr.fontSize = fontSize;
+        this->textAttributes.fontSize = fontSize;
     }
 
     inline void SetFontPath(const string &fontPath) {
-        this->text_attr.fontPath = fontPath;
+        this->textAttributes.fontPath = fontPath;
     }
 
-    inline void SetFontRGBAColor(const Uint8 r, const Uint8 g, const Uint8 b, const Uint8 a) {
-        this->text_attr.Color.r = r;
-        this->text_attr.Color.g = g;
-        this->text_attr.Color.b = b;
-        this->text_attr.Color.a = a;
+    inline void SetForegroundColor(const Uint8 r, const Uint8 g, const Uint8 b, const Uint8 a) {
+        textAttributes.Color.r = r;
+        textAttributes.Color.g = g;
+        textAttributes.Color.b = b;
+        textAttributes.Color.a = a;
+    }
+
+    inline void SetText(const string &text) {
+        textAttributes.text = text;
     }
 
     void Render(SDL_Renderer* const renderer) {
         {
             // lock scope
             lock_guard<mutex> lockGuard(attr_mutex);
-            SDL_SetRenderDrawColor(renderer, button_attr.Color.r, button_attr.Color.g, button_attr.Color.b,
-                                   button_attr.Color.a);
-            SDL_RenderFillRect(renderer, &button_attr.rectangle);
+            SDL_SetRenderDrawColor(renderer, buttonAttributes.Color.r, buttonAttributes.Color.g,
+                                   buttonAttributes.Color.b,
+                                   buttonAttributes.Color.a);
+            SDL_RenderFillRect(renderer, &buttonAttributes.rectangle);
         }
-        setText(renderer);
+        RenderText(renderer);
     }
 
     void Update(const SDL_Event* const evt) {
@@ -272,10 +281,10 @@ public:
         bool IsMouseOver;
         {   // lock scope
             lock_guard<mutex> lockGuard(attr_mutex);
-            IsMouseOver = evt->button.x >= button_attr.rectangle.x &&
-                          evt->button.x <= (button_attr.rectangle.x + button_attr.rectangle.w) &&
-                          evt->button.y >= button_attr.rectangle.y &&
-                          evt->button.y <= (button_attr.rectangle.y + button_attr.rectangle.h);
+            IsMouseOver = evt->button.x >= buttonAttributes.rectangle.x &&
+                          evt->button.x <= (buttonAttributes.rectangle.x + buttonAttributes.rectangle.w) &&
+                          evt->button.y >= buttonAttributes.rectangle.y &&
+                          evt->button.y <= (buttonAttributes.rectangle.y + buttonAttributes.rectangle.h);
         }
 
         if (evt->type == SDL_MOUSEBUTTONDOWN) {
@@ -301,23 +310,23 @@ public:
     }
 
     inline void AddHandler(MouseLeftButtonDownHandler<Button>* handler) {
-        lock_guard<mutex> lockGuard(this->buttonDown_mutex);
-        this->buttonDown_Handlers.push_back(handler);
+        lock_guard<mutex> lockGuard(buttonDown_mutex);
+        buttonDown_handlers.push_back(handler);
     }
 
     inline void AddHandler(MouseLeftButtonUpHandler<Button>* handler) {
-        lock_guard<mutex> lockGuard(this->buttonUp_mutex);
-        this->buttonUp_Handlers.push_back(handler);
+        lock_guard<mutex> lockGuard(buttonUp_mutex);
+        buttonUp_handlers.push_back(handler);
     }
 
     inline void AddHandler(MouseOverHandler<Button>* handler) {
-        lock_guard<mutex> lockGuard(this->mouseOver_mutex);
-        this->mouseOver_Handlers.push_back(handler);
+        lock_guard<mutex> lockGuard(mouseOver_mutex);
+        mouseOver_handlers.push_back(handler);
     }
 
     inline void AddHandler(MouseOutHandler<Button>* handler) {
-        lock_guard<mutex> lockGuard(this->mouseOut_mutex);
-        this->mouseOut_Handlers.push_back(handler);
+        lock_guard<mutex> lockGuard(mouseOut_mutex);
+        mouseOut_handlers.push_back(handler);
     }
 };
 

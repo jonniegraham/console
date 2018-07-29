@@ -15,7 +15,7 @@ public:
     }
 
     inline void Invoke(T* const t) {
-        this->handlerFunc(t);
+        handlerFunc(t);
     }
 
     inline void SetEnabled(const bool isEnabled = true) {
@@ -23,7 +23,7 @@ public:
     }
 
     inline const bool IsEnabled() const {
-        return this->isEnabled;
+        return isEnabled;
     }
 private:
     HandlerFunc* handlerFunc;
