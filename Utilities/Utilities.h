@@ -13,5 +13,10 @@ public:
         }
         v.clear();
     }
+
+    inline static void HandleError(const char* const errorMessage) {
+        cerr << errorMessage;
+        exit(EXIT_FAILURE);
+    }
 };
 #endif //CONSOLE_UTILITIES_H

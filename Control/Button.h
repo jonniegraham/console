@@ -12,6 +12,7 @@
 #include "../Handler/MouseOutHandler.h"
 #include "Control.h"
 #include "../Utilities/Utilities.h"
+#include "../Font/Font.h"
 
 using namespace std;
 
@@ -31,13 +32,8 @@ private:
     } ButtonAttributes;
 
     typedef struct {
-        SDL_Rect rectangle;
+        Font* font;
         string text = "";
-        int fontSize = 12;
-        string fontPath = "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf";
-        struct {
-            Uint8 r = 0, g = 0, b = 0, a = 0;
-        } Color;
 
     } TextAttributes;
 
@@ -48,11 +44,11 @@ private:
     mutex buttonUp_mutex;
     mutex mouseOver_mutex;
     mutex mouseOut_mutex;
-    mutex attr_mutex;
+    mutex buttonAttributes_mutex;
 
     SDL_Texture* textTexture = nullptr;
     SDL_Surface* surface = nullptr;
-    TTF_Font* font = nullptr;
+
 
     vector<MouseLeftButtonDownHandler<Button>*> buttonDown_handlers;
     vector<MouseLeftButtonUpHandler<Button>*> buttonUp_handlers;
@@ -60,17 +56,17 @@ private:
     vector<MouseOutHandler<Button>*> mouseOut_handlers;
 
     inline void initializeFont() {
-        if (font == nullptr) {
-            font = TTF_OpenFont(textAttributes.fontPath.c_str(), textAttributes.fontSize);
-            TTF_SetFontStyle(font, TTF_STYLE_BOLD);
+        if (textAttributes.font == nullptr) {
+            Utilities::HandleError("Foreground Font not set.");
         }
+        TTF_SetFontStyle(textAttributes.font->GetFont(), TTF_STYLE_BOLD);
     }
 
     inline void initializeTTF() const {
         if (TTF_Init() != 0) {
             stringstream ss;
             ss << "Error: Initializing TTF failed\n";
-            handleError(ss.str().c_str());
+            Utilities::HandleError(ss.str().c_str());
         }
     }
 
@@ -84,34 +80,27 @@ private:
         freeTextResources();
         initializeTTF();
         initializeFont();
-
-        {   // lock scope
-            lock_guard<mutex> lockGuard(attr_mutex);
-            textAttributes.rectangle.x = static_cast<int>(buttonAttributes.rectangle.x +
-                                                          (buttonAttributes.rectangle.w / 2) -
-                                                          ((textAttributes.text.length() / 2) *
-                                                           (textAttributes.fontSize -
-                                                            (0.35 * textAttributes.fontSize))));
-            textAttributes.rectangle.y = static_cast<int>(buttonAttributes.rectangle.y +
-                                                          (buttonAttributes.rectangle.h / 2) -
-                                                          ((textAttributes.fontSize - (0.1 * textAttributes.fontSize)) /
-                                                           2));
+        int x, y;
+        {
+            lock_guard<mutex> lockGuard(buttonAttributes_mutex);
+            x = static_cast<int>(buttonAttributes.rectangle.x +
+                                     (buttonAttributes.rectangle.w / 2) -
+                                     ((textAttributes.text.length() / 2) *
+                                      (textAttributes.font->getSize() -
+                                       (0.35 * textAttributes.font->getSize()))));
+            y = static_cast<int>(buttonAttributes.rectangle.y +
+                                     (buttonAttributes.rectangle.h / 2) -
+                                     ((textAttributes.font->getSize() - (0.1 * textAttributes.font->getSize())) /
+                                      2));
         }
 
-        surface = TTF_RenderText_Solid(font, textAttributes.text.c_str(),
-                                       {textAttributes.Color.r, textAttributes.Color.g, textAttributes.Color.b,
-                                        textAttributes.Color.a});
+        surface = TTF_RenderText_Solid(textAttributes.font->GetFont(), textAttributes.text.c_str(),
+                                       textAttributes.font->GetColor());
 
-        textAttributes.rectangle.w = surface->w;
-        textAttributes.rectangle.h = surface->h;
+        textAttributes.font->SetRectangle(x, y, surface->w, surface->h);
 
         textTexture = SDL_CreateTextureFromSurface(renderer, surface);
-        SDL_RenderCopy(renderer, textTexture, NULL, &textAttributes.rectangle);
-    }
-
-    inline void handleError(const char* const errorMessage) const {
-        cerr << errorMessage;
-        exit(EXIT_FAILURE);
+        SDL_RenderCopy(renderer, textTexture, NULL, &textAttributes.font->GetRectangle());
     }
 
     void resetButtonDownHandlers() {
@@ -230,7 +219,7 @@ public:
 
     inline void
     SetRectangle(const unsigned int x, const unsigned int y, const unsigned int height, const unsigned int width) {
-        lock_guard<mutex> lockGuard(attr_mutex);
+        lock_guard<mutex> lockGuard(buttonAttributes_mutex);
         buttonAttributes.rectangle.x = x;
         buttonAttributes.rectangle.y = y;
         buttonAttributes.rectangle.w = width;
@@ -238,36 +227,25 @@ public:
     }
 
     inline void SetBackgroundColor(const Uint8 r, const Uint8 g, const Uint8 b, const Uint8 a) {
-        lock_guard<mutex> lockGuard(attr_mutex);
+        lock_guard<mutex> lockGuard(buttonAttributes_mutex);
         buttonAttributes.Color.r = r;
         buttonAttributes.Color.g = g;
         buttonAttributes.Color.b = b;
         buttonAttributes.Color.a = a;
     }
 
-    inline void SetFontSize(const unsigned int fontSize) {
-        this->textAttributes.fontSize = fontSize;
-    }
-
-    inline void SetFontPath(const string &fontPath) {
-        this->textAttributes.fontPath = fontPath;
-    }
-
-    inline void SetForegroundColor(const Uint8 r, const Uint8 g, const Uint8 b, const Uint8 a) {
-        textAttributes.Color.r = r;
-        textAttributes.Color.g = g;
-        textAttributes.Color.b = b;
-        textAttributes.Color.a = a;
-    }
-
     inline void SetText(const string &text) {
         textAttributes.text = text;
+    }
+
+    inline void SetFont(Font *font) {
+        textAttributes.font = font;
     }
 
     void Render(SDL_Renderer* const renderer) {
         {
             // lock scope
-            lock_guard<mutex> lockGuard(attr_mutex);
+            lock_guard<mutex> lockGuard(buttonAttributes_mutex);
             SDL_SetRenderDrawColor(renderer, buttonAttributes.Color.r, buttonAttributes.Color.g,
                                    buttonAttributes.Color.b,
                                    buttonAttributes.Color.a);
@@ -280,7 +258,7 @@ public:
 
         bool IsMouseOver;
         {   // lock scope
-            lock_guard<mutex> lockGuard(attr_mutex);
+            lock_guard<mutex> lockGuard(buttonAttributes_mutex);
             IsMouseOver = evt->button.x >= buttonAttributes.rectangle.x &&
                           evt->button.x <= (buttonAttributes.rectangle.x + buttonAttributes.rectangle.w) &&
                           evt->button.y >= buttonAttributes.rectangle.y &&

@@ -86,7 +86,6 @@ public:
         SDL_DestroyWindow(window);
         SDL_DestroyRenderer(renderer);
     }
-
 };
 
 

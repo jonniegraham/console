@@ -5,6 +5,8 @@ int main(int argc, char* argv[]) {
 
     auto* b1 = new Button();
     b1->SetRectangle(5, 5, 30, 100);
+    b1->SetFont(new Font(Font::Type::Lohit));
+
     b1->AddHandler(new MouseLeftButtonDownHandler<Button>([](Button* thisButton) {
         thisButton->SetBackgroundColor(180, 180, 180, 255);
     }));
@@ -20,6 +22,8 @@ int main(int argc, char* argv[]) {
 
     auto* b2 = new Button();
     b2->SetRectangle(110, 5, 30, 100);
+    b2->SetFont(new Font(Font::Type::Gargi));
+
     b2->AddHandler(new MouseLeftButtonDownHandler<Button>([](Button* thisButton) {
         thisButton->SetBackgroundColor(180, 180, 180, 255);
     }));
