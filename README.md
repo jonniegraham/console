@@ -1,10 +1,14 @@
 ### A library for building UIs
 ## Based on SDL2
 # Have implemented:
-⋅⋅* Canvas
-⋅⋅* Button
+⋅⋅* Canvas.
+
+⋅⋅* Button.
+
 ⋅⋅* Java-Style Handlers
 # To do:
-⋅⋅* Textbox
-⋅⋅* Tabbed "views
-⋅⋅* Table
+⋅⋅* Textbox.
+
+⋅⋅* Tabbed "views.
+
+⋅⋅* Table.
